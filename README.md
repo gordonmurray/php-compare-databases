@@ -1,7 +1,7 @@
 PHP compare databases
 =====================
 
-A script to determine if 2 mySQL Databases such as a 'Development' and 'Live' database have the same tables and table structures.
+A Codeigniter Controller to determine if 2 mySQL Databases such as a 'Development' and 'Live' database have the same tables and table structures.
 
 It will show the SQL commands needed to create tables in the Live database if they do not exist.
 
