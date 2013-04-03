@@ -48,6 +48,8 @@ class Compare extends MY_Controller
                 echo "<h2>Databases table structures are out of Sync!</h3>\n";
                 echo "The following tables need to be updated<br />\n";
                 print_r($tables_up_update);
+
+                $this->update_existing_tables($tables_up_update);
             }
             else
             {
@@ -88,8 +90,8 @@ class Compare extends MY_Controller
 
     /**
      * Go through each table, compare their sql structure
-     * @param type $development_tables
-     * @param type $live_tables
+     * @param array $development_tables
+     * @param array $live_tables
      */
     function compare_table_structures($development_tables, $live_tables)
     {
@@ -131,7 +133,7 @@ class Compare extends MY_Controller
             $development_table = $development_table_structures[$table];
             $live_table = $live_table_structures[$table];
 
-            if ($this->differences($development_table, $live_table) > 0)
+            if ($this->count_differences($development_table, $live_table) > 0)
             {
                 $tables_need_updating[] = $table;
             }
@@ -142,11 +144,11 @@ class Compare extends MY_Controller
 
     /**
      * Count differences in 2 sql statements
-     * @param type $old
-     * @param type $new
-     * @return int
+     * @param string $old
+     * @param string $new
+     * @return int $differences
      */
-    function differences($old, $new)
+    function count_differences($old, $new)
     {
         $differences = 0;
         $old = trim(preg_replace('/\s+/', '', $old));
@@ -170,6 +172,60 @@ class Compare extends MY_Controller
         }
 
         return $differences;
+    }
+
+    /**
+     * Given an array of tables that differ from DB1 to DB2, update DB2
+     * @param array $tables
+     */
+    function update_existing_tables($tables)
+    {
+        /*
+         * load both databases
+         */
+        $DB1 = $this->load->database('development', TRUE);
+        $DB2 = $this->load->database('live', TRUE);
+
+        if (is_array($tables) && !empty($tables))
+        {
+            foreach ($tables as $table)
+            {
+                $table_structure[$table] = $this->table_field_data((array) $DB1, $table);
+            }
+
+            print_r($table_structure);
+        }
+    }
+
+    /**
+     * Given a database and a table, compile an array of field meta data
+     * @param array $database
+     * @param string $table
+     * @return array $fields
+     */
+    function table_field_data($database, $table)
+    {
+        $fields = array();
+
+        $conn = mysql_connect($database["hostname"], $database["username"], $database["password"]);
+
+        mysql_select_db($database["database"]);
+        $result = mysql_query('select * from ' . $table);
+
+        $i = 0;
+        while ($i < mysql_num_fields($result))
+        {
+
+            $meta = mysql_fetch_field($result, $i);
+            if ($meta)
+            {
+                $fields[] = (array) $meta;
+                $i++;
+            }
+        }
+        mysql_free_result($result);
+
+        return $fields;
     }
 
 }
