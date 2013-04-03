@@ -41,7 +41,22 @@ class Compare extends MY_Controller
         if (is_array($tables_to_create) && !empty($tables_to_create))
         {
             echo "<h2>Databases tables are out of Sync!</h3>\n";
-            $this->create_new_tables($tables_to_create);
+
+            $sql_commands_to_run = $this->create_new_tables($tables_to_create);
+
+            echo "<p>The following SQL commands need to be executed to bring the Live database tables up to date: </p>\n";
+
+            if (is_array($sql_commands_to_run) && !empty($sql_commands_to_run))
+            {
+                foreach ($sql_commands_to_run as $sql_command)
+                {
+                    echo $sql_command . "<br />\n";
+                }
+            }
+            else
+            {
+                echo "No table changes found<br />\n";
+            }
         }
         else
         {
@@ -50,15 +65,29 @@ class Compare extends MY_Controller
 
             if (is_array($tables_up_update) && !empty($tables_up_update))
             {
-                echo "<h2>Databases table structures are out of Sync!</h3>\n";
-                echo "The following tables need to be updated:<br />\n";
+                echo "<h2>Databases table structures are out of Sync!</h2>\n";
+                echo "<p>The following tables need to be updated:<p>\n";
 
                 foreach ($tables_up_update as $table)
                 {
                     echo " - $table <br />\n";
                 }
 
-                $this->update_existing_tables($tables_up_update);
+                $sql_commands_to_run = $this->update_existing_tables($tables_up_update);
+
+                echo "<p>The following SQL commands need to be executed to bring the Live database up to date: </p>\n";
+
+                if (is_array($sql_commands_to_run) && !empty($sql_commands_to_run))
+                {
+                    foreach ($sql_commands_to_run as $sql_command)
+                    {
+                        echo $sql_command . "<br />\n";
+                    }
+                }
+                else
+                {
+                    echo "No field changes found<br />\n";
+                }
             }
             else
             {
@@ -80,22 +109,16 @@ class Compare extends MY_Controller
         $DB1 = $this->load->database('development', TRUE);
         $DB2 = $this->load->database('live', TRUE);
 
+        $sql_commands_to_run = array();
 
         foreach ($tables_to_create as $table)
         {
             $query = $DB1->query("SHOW CREATE TABLE $table -- create tables");
             $table_structure = $query->row_array();
-            $table_sql = $table_structure["Create Table"];
-
-            if ($DB2->simple_query($table_sql))
-            {
-                echo "Created table: $table<br />\n";
-            }
-            else
-            {
-                echo "Failed to create table: $table<br />\n";
-            }
+            $sql_commands_to_run[] = $table_structure["Create Table"];
         }
+
+        return $sql_commands_to_run;
     }
 
     /**
@@ -213,28 +236,16 @@ class Compare extends MY_Controller
         $sql_commands_to_run = array_merge($sql_commands_to_run, $this->determine_field_changes($table_structure_live, $table_structure_development, 'drop'));
 
         /*
-         * second, update any fields that are in $table_structure_live already
+         * TODO: second, update any fields that are in $table_structure_live already
          */
-        $sql_commands_to_run = array_merge($sql_commands_to_run, $this->determine_field_changes($table_structure_development, $table_structure_live, 'add'));
-
+        //$sql_commands_to_run = '';
 
         /*
          * third, add any fields that are not present in $table_structure_live
          */
+        $sql_commands_to_run = array_merge($sql_commands_to_run, $this->determine_field_changes($table_structure_development, $table_structure_live, 'add'));
 
-        echo "<p>The following SQL commands need to be executed to bring the Live database up to date: </p>\n";
-
-        if (is_array($sql_commands_to_run) && !empty($sql_commands_to_run))
-        {
-            foreach ($sql_commands_to_run as $sql_command)
-            {
-                echo $sql_command . "<br />\n";
-            }
-        }
-        else
-        {
-            echo "No changes found<br />\n";
-        }
+        return $sql_commands_to_run;
     }
 
     /**
