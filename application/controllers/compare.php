@@ -186,15 +186,29 @@ class Compare extends MY_Controller
         $DB1 = $this->load->database('development', TRUE);
         $DB2 = $this->load->database('live', TRUE);
 
+        $table_structure_development = array();
+        $table_structure_live = array();
+
         if (is_array($tables) && !empty($tables))
         {
             foreach ($tables as $table)
             {
-                $table_structure[$table] = $this->table_field_data((array) $DB1, $table);
+                $table_structure_development[$table] = $this->table_field_data((array) $DB1, $table);
+                $table_structure_live[$table] = $this->table_field_data((array) $DB2, $table);
             }
-
-            print_r($table_structure);
         }
+
+        /*
+         * first, remove any fields from $table_structure_live that are no longer in $table_structure_development
+         */
+
+        /*
+         * second, update any fields that are in $table_structure_live already
+         */
+
+        /*
+         * third, add any fields that are not present in $table_structure_live
+         */
     }
 
     /**
@@ -206,7 +220,6 @@ class Compare extends MY_Controller
     function table_field_data($database, $table)
     {
         $fields = array();
-
         $conn = mysql_connect($database["hostname"], $database["username"], $database["password"]);
 
         mysql_select_db($database["database"]);
