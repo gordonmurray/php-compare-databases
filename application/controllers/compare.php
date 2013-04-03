@@ -28,6 +28,11 @@ class Compare extends MY_Controller
         /*
          * list any tables in the development database that are not in the live database
          */
+        /*
+         * TODO: Update this next step to remove tables if no longer used
+         * currently it only adds tables to the Live DB if they are not there
+         * it should also delete old tables that are no longer in use on the live site
+         */
         $tables_to_create = array_diff($development_tables, $live_tables);
 
         /**
@@ -46,8 +51,12 @@ class Compare extends MY_Controller
             if (is_array($tables_up_update) && !empty($tables_up_update))
             {
                 echo "<h2>Databases table structures are out of Sync!</h3>\n";
-                echo "The following tables need to be updated<br />\n";
-                print_r($tables_up_update);
+                echo "The following tables need to be updated:<br />\n";
+
+                foreach ($tables_up_update as $table)
+                {
+                    echo " - $table <br />\n";
+                }
 
                 $this->update_existing_tables($tables_up_update);
             }
@@ -71,9 +80,10 @@ class Compare extends MY_Controller
         $DB1 = $this->load->database('development', TRUE);
         $DB2 = $this->load->database('live', TRUE);
 
+
         foreach ($tables_to_create as $table)
         {
-            $query = $DB1->query("SHOW CREATE TABLE $table");
+            $query = $DB1->query("SHOW CREATE TABLE $table -- create tables");
             $table_structure = $query->row_array();
             $table_sql = $table_structure["Create Table"];
 
@@ -110,7 +120,7 @@ class Compare extends MY_Controller
          */
         foreach ($development_tables as $table)
         {
-            $query = $DB1->query("SHOW CREATE TABLE $table");
+            $query = $DB1->query("SHOW CREATE TABLE $table -- dev");
             $table_structure = $query->row_array();
             $development_table_structures[$table] = $table_structure["Create Table"];
         }
@@ -120,7 +130,7 @@ class Compare extends MY_Controller
          */
         foreach ($live_tables as $table)
         {
-            $query = $DB2->query("SHOW CREATE TABLE $table");
+            $query = $DB2->query("SHOW CREATE TABLE $table -- live");
             $table_structure = $query->row_array();
             $live_table_structures[$table] = $table_structure["Create Table"];
         }
@@ -180,9 +190,6 @@ class Compare extends MY_Controller
      */
     function update_existing_tables($tables)
     {
-        /*
-         * load both databases
-         */
         $DB1 = $this->load->database('development', TRUE);
         $DB2 = $this->load->database('live', TRUE);
 
@@ -198,17 +205,36 @@ class Compare extends MY_Controller
             }
         }
 
+        $sql_commands_to_run = array(); // TODO: Start with a transaction lock?
+
         /*
          * first, remove any fields from $table_structure_live that are no longer in $table_structure_development
          */
+        $sql_commands_to_run = array_merge($sql_commands_to_run, $this->determine_field_changes($table_structure_live, $table_structure_development, 'drop'));
 
         /*
          * second, update any fields that are in $table_structure_live already
          */
+        $sql_commands_to_run = array_merge($sql_commands_to_run, $this->determine_field_changes($table_structure_development, $table_structure_live, 'add'));
+
 
         /*
          * third, add any fields that are not present in $table_structure_live
          */
+
+        echo "<p>The following SQL commands need to be executed to bring the Live database up to date: </p>\n";
+
+        if (is_array($sql_commands_to_run) && !empty($sql_commands_to_run))
+        {
+            foreach ($sql_commands_to_run as $sql_command)
+            {
+                echo $sql_command . "<br />\n";
+            }
+        }
+        else
+        {
+            echo "No changes found<br />\n";
+        }
     }
 
     /**
@@ -241,7 +267,65 @@ class Compare extends MY_Controller
         return $fields;
     }
 
+    /**
+     * Give to arrays of table fields, remove any unused fields
+     * @param array $table_structure_development
+     * @param array $table_structure_live
+     * @return array $sql_commands_to_run
+     */
+    function determine_field_changes($source_field_structures, $destination_field_structures, $action)
+    {
+        $sql_commands_to_run = array();
+
+        foreach ($source_field_structures as $table => $live_fields)
+        {
+            foreach ($live_fields as $field)
+            {
+                /*
+                 * check to see if this field in in the development database
+                 * if it is no longer in the development database it is assumed 
+                 * it is removed and should be removed from the Live database too
+                 */
+                if (!$this->in_array_recursive($field["name"], $destination_field_structures[$table]))
+                {
+                    //echo "<strong>The field name '" . $field["name"] . "' is missing inside '$table'</strong><br />";
+                    if ($action == 'drop')
+                    {
+                        $sql_commands_to_run[] = "ALTER TABLE $table DROP COLUMN " . $field["name"];
+                    }
+                    else
+                    {
+                        $sql_commands_to_run[] = "ALTER TABLE $table ADD COLUMN " . $field["name"];
+                    }
+                }
+            }
+        }
+
+        return $sql_commands_to_run;
+    }
+
+    /**
+     * Recursive version of in_array
+     * @param type $needle
+     * @param type $haystack
+     * @param type $strict
+     * @return boolean
+     */
+    function in_array_recursive($needle, $haystack, $strict = false)
+    {
+        foreach ($haystack as $array => $item)
+        {
+            $item = $item["name"]; // look in the name field only
+            if (($strict ? $item === $needle : $item == $needle) || (is_array($item) && in_array_recursive($needle, $item, $strict)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
 }
 
 /* End of file compare.php */
-    /* Location: ./application/controllers/compare.php */
+/* Location: ./application/controllers/compare.php */
