@@ -34,7 +34,7 @@ class Compare extends MY_Controller
         $tables_to_drop = array_diff($live_tables, $development_tables);
 
         /**
-         * Create any tables that are not in the Live database
+         * Create/Drop any tables that are not in the Live database
          */
         $sql_commands_to_run = (is_array($tables_to_create) && !empty($tables_to_create)) ? array_merge($sql_commands_to_run, $this->manage_tables($tables_to_create, 'create')) : '';
         $sql_commands_to_run = (is_array($tables_to_drop) && !empty($tables_to_drop)) ? array_merge($sql_commands_to_run, $this->manage_tables($tables_to_drop, 'drop')) : '';
@@ -47,7 +47,7 @@ class Compare extends MY_Controller
         $tables_to_update = array_diff($tables_to_update, $tables_to_create);
 
         /*
-         * update tables, add/remove columns
+         * update tables, add/update/emove columns
          */
         $sql_commands_to_run = (is_array($tables_to_update) && !empty($tables_to_update)) ? array_merge($sql_commands_to_run, $this->update_existing_tables($tables_to_update)) : '';
 
@@ -199,19 +199,9 @@ class Compare extends MY_Controller
         }
 
         /*
-         * first, remove any fields from $table_structure_live that are no longer in $table_structure_development
+         * add, remove or update any fields in $table_structure_live
          */
-        $sql_commands_to_run = array_merge($sql_commands_to_run, $this->determine_field_changes($table_structure_live, $table_structure_development, 'drop'));
-
-        /*
-         * TODO: second, update any fields that are in $table_structure_live already
-         */
-        //$sql_commands_to_run = '';
-
-        /*
-         * third, add any fields that are not present in $table_structure_live
-         */
-        $sql_commands_to_run = array_merge($sql_commands_to_run, $this->determine_field_changes($table_structure_development, $table_structure_live, 'add'));
+        $sql_commands_to_run = array_merge($sql_commands_to_run, $this->determine_field_changes($table_structure_development, $table_structure_live));
 
         return $sql_commands_to_run;
     }
@@ -239,40 +229,61 @@ class Compare extends MY_Controller
     }
 
     /**
-     * Give to arrays of table fields, remove any unused fields
-     * @param array $table_structure_development
-     * @param array $table_structure_live
-     * @return array $sql_commands_to_run
+     * Given to arrays of table fields, add/edit/remove fields
+     * @param type $source_field_structures
+     * @param type $destination_field_structures
      */
-    function determine_field_changes($source_field_structures, $destination_field_structures, $action)
+    function determine_field_changes($source_field_structures, $destination_field_structures)
     {
         $sql_commands_to_run = array();
 
-        foreach ($source_field_structures as $table => $live_fields)
+        /**
+         * loop through the source (usually development) database
+         */
+        foreach ($source_field_structures as $table => $fields)
         {
-            foreach ($live_fields as $field)
+            foreach ($fields as $field)
             {
-                /*
-                 * check to see if this field in in the development database
-                 * if it is no longer in the development database it is assumed 
-                 * it is removed and should be removed from the Live database too
-                 */
-                if (!$this->in_array_recursive($field["Field"], $destination_field_structures[$table]))
+                if ($this->in_array_recursive($field["Field"], $destination_field_structures[$table]))
                 {
-                    //echo "<strong>The field name '" . $field["name"] . "' is missing inside '$table'</strong><br />";
-                    if ($action == 'drop')
+                    $modify_field = '';
+                    /*
+                     * Check for required modifications
+                     */
+                    for ($n = 0; $n < count($fields); $n++)
                     {
-                        $sql_commands_to_run[] = "ALTER TABLE $table DROP COLUMN " . $field["Field"];
+                        if (isset($fields[$n]) && isset($destination_field_structures[$table][$n]) && ($fields[$n]["Field"] == $destination_field_structures[$table][$n]["Field"]))
+                        {
+                            $differences = array_diff($fields[$n], $destination_field_structures[$table][$n]);
+
+                            if (is_array($differences) && !empty($differences))
+                            {
+                                // ALTER TABLE `bugs` MODIFY COLUMN `site_name`  varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL AFTER `type`;
+                                // ALTER TABLE `bugs` MODIFY COLUMN `message`  varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL AFTER `site_name`;
+                                $modify_field = "ALTER TABLE $table MODIFY COLUMN " . $fields[$n]["Field"] . ' ' . $fields[$n]["Type"] . ' CHARACTER SET ' . $this->CHARACTER_SET;
+                                $modify_field .= (isset($fields[$n]["Default"]) && $fields[$n]["Default"] != '') ? ' DEFAULT \'' . $fields[$n]["Default"] . '\'' : '';
+                                $modify_field .= (isset($fields[$n]["Extra"]) && $fields[$n]["Extra"] != '') ? ' ' . $fields[$n]["Extra"] : '';
+                                $modify_field .= (isset($previous_field) && $previous_field != '') ? ' AFTER ' . $previous_field : '';
+                                $modify_field .= ';';
+                            }
+                            $previous_field = $fields[$n]["Field"];
+                        }
+
+                        if ($modify_field != '' && !in_array($modify_field, $sql_commands_to_run))
+                            $sql_commands_to_run[] = $modify_field;
                     }
-                    else
-                    {
-                        $alter_query = "ALTER TABLE $table ADD COLUMN " . $field["Field"] . " " . $field["Type"] . " CHARACTER SET " . $this->CHARACTER_SET;
-                        $alter_query .= (isset($field["Null"]) && $field["Null"] == 'YES') ? ' Null' : '';
-                        $alter_query .= " DEFAULT " . $field["Default"];
-                        $alter_query .= (isset($field["Extra"]) && $field["Extra"] != '') ? ' ' . $field["Extra"] : '';
-                        $alter_query .= ';';
-                        $sql_commands_to_run[] = $alter_query;
-                    }
+                }
+                else
+                {
+                    /*
+                     * Add 
+                     */
+                    $add_field = "ALTER TABLE $table ADD COLUMN " . $field["Field"] . " " . $field["Type"] . " CHARACTER SET " . $this->CHARACTER_SET;
+                    $add_field .= (isset($field["Null"]) && $field["Null"] == 'YES') ? ' Null' : '';
+                    $add_field .= " DEFAULT " . $field["Default"];
+                    $add_field .= (isset($field["Extra"]) && $field["Extra"] != '') ? ' ' . $field["Extra"] : '';
+                    $add_field .= ';';
+                    $sql_commands_to_run[] = $add_field;
                 }
             }
         }
@@ -304,4 +315,4 @@ class Compare extends MY_Controller
 }
 
 /* End of file compare.php */
-/* Location: ./application/controllers/compare.php */
+                /* Location: ./application/controllers/compare.php */
