@@ -9,6 +9,9 @@ class Compare extends MY_Controller
     function __construct()
     {
         parent::__construct();
+        $this->CHARACTER_SET = "utf8 COLLATE utf8_general_ci";
+        $this->DB1 = $this->load->database('development', TRUE); // load the source/development database
+        $this->DB2 = $this->load->database('live', TRUE); // load the destination/live database
     }
 
     function index()
@@ -19,34 +22,22 @@ class Compare extends MY_Controller
         $sql_commands_to_run = array();
 
         /*
-         * load both databases
-         */
-        $DB1 = $this->load->database('development', TRUE);
-        $DB2 = $this->load->database('live', TRUE);
-
-        /*
          * list the tables from both databases
          */
-        $development_tables = $DB1->list_tables();
-        $live_tables = $DB2->list_tables();
+        $development_tables = $this->DB1->list_tables();
+        $live_tables = $this->DB2->list_tables();
 
         /*
-         * list any tables in the development database that are not in the live database
+         * list any tables that need to be created or dropped
          */
         $tables_to_create = array_diff($development_tables, $live_tables);
+        $tables_to_drop = array_diff($live_tables, $development_tables);
 
         /**
          * Create any tables that are not in the Live database
          */
-        if (is_array($tables_to_create) && !empty($tables_to_create))
-        {
-            /*
-             * TODO: Update this next step to remove tables if no longer used
-             * currently it only adds tables to the Live DB if they are not there
-             * it should also delete old tables that are no longer in use on the live site
-             */
-            $sql_commands_to_run = array_merge($sql_commands_to_run, $this->create_new_tables($tables_to_create));
-        }
+        $sql_commands_to_run = (is_array($tables_to_create) && !empty($tables_to_create)) ? array_merge($sql_commands_to_run, $this->manage_tables($tables_to_create, 'create')) : '';
+        $sql_commands_to_run = (is_array($tables_to_drop) && !empty($tables_to_drop)) ? array_merge($sql_commands_to_run, $this->manage_tables($tables_to_drop, 'drop')) : '';
 
         $tables_to_update = $this->compare_table_structures($development_tables, $live_tables);
 
@@ -78,25 +69,31 @@ class Compare extends MY_Controller
     }
 
     /**
-     * Create new tables in the destination database
-     * @param type $database_group
-     * @param type $tables_to_create
+     * Manage tables, create or drop them
+     * @param array $tables
+     * @param string $action
+     * @return array $sql_commands_to_run
      */
-    function create_new_tables($tables_to_create)
+    function manage_tables($tables, $action)
     {
-        /*
-         * load both databases
-         */
-        $DB1 = $this->load->database('development', TRUE);
-        $DB2 = $this->load->database('live', TRUE);
-
         $sql_commands_to_run = array();
 
-        foreach ($tables_to_create as $table)
+        if ($action == 'create')
         {
-            $query = $DB1->query("SHOW CREATE TABLE $table -- create tables");
-            $table_structure = $query->row_array();
-            $sql_commands_to_run[] = $table_structure["Create Table"];
+            foreach ($tables as $table)
+            {
+                $query = $this->DB1->query("SHOW CREATE TABLE $table -- create tables");
+                $table_structure = $query->row_array();
+                $sql_commands_to_run[] = $table_structure["Create Table"];
+            }
+        }
+
+        if ($action == 'drop')
+        {
+            foreach ($tables as $table)
+            {
+                $sql_commands_to_run[] = "DROP TABLE $table;";
+            }
         }
 
         return $sql_commands_to_run;
@@ -109,12 +106,6 @@ class Compare extends MY_Controller
      */
     function compare_table_structures($development_tables, $live_tables)
     {
-        /*
-         * load both databases
-         */
-        $DB1 = $this->load->database('development', TRUE);
-        $DB2 = $this->load->database('live', TRUE);
-
         $tables_need_updating = array();
 
         $live_table_structures = $development_table_structures = array();
@@ -124,7 +115,7 @@ class Compare extends MY_Controller
          */
         foreach ($development_tables as $table)
         {
-            $query = $DB1->query("SHOW CREATE TABLE $table -- dev");
+            $query = $this->DB1->query("SHOW CREATE TABLE $table -- dev");
             $table_structure = $query->row_array();
             $development_table_structures[$table] = $table_structure["Create Table"];
         }
@@ -134,7 +125,7 @@ class Compare extends MY_Controller
          */
         foreach ($live_tables as $table)
         {
-            $query = $DB2->query("SHOW CREATE TABLE $table -- live");
+            $query = $this->DB2->query("SHOW CREATE TABLE $table -- live");
             $table_structure = $query->row_array();
             $live_table_structures[$table] = $table_structure["Create Table"];
         }
@@ -194,9 +185,6 @@ class Compare extends MY_Controller
      */
     function update_existing_tables($tables)
     {
-        $DB1 = $this->load->database('development', TRUE);
-        $DB2 = $this->load->database('live', TRUE);
-
         $table_structure_development = array();
         $table_structure_live = array();
 
@@ -204,8 +192,8 @@ class Compare extends MY_Controller
         {
             foreach ($tables as $table)
             {
-                $table_structure_development[$table] = $this->table_field_data((array) $DB1, $table);
-                $table_structure_live[$table] = $this->table_field_data((array) $DB2, $table);
+                $table_structure_development[$table] = $this->table_field_data((array) $this->DB1, $table);
+                $table_structure_live[$table] = $this->table_field_data((array) $this->DB2, $table);
             }
         }
 
@@ -237,29 +225,17 @@ class Compare extends MY_Controller
      */
     function table_field_data($database, $table)
     {
-        $fields = array();
-
         $conn = mysql_connect($database["hostname"], $database["username"], $database["password"]);
 
         mysql_select_db($database["database"]);
 
-        $result = mysql_query('select * from ' . $table);
+        $result = mysql_query("SHOW COLUMNS FROM " . $table);
 
-        if (is_resource($result))
+        while ($row = mysql_fetch_assoc($result))
         {
-            $i = 0;
-            while ($i < mysql_num_fields($result))
-            {
-
-                $meta = mysql_fetch_field($result, $i);
-                if ($meta)
-                {
-                    $fields[] = (array) $meta;
-                    $i++;
-                }
-            }
-            mysql_free_result($result);
+            $fields[] = $row;
         }
+
         return $fields;
     }
 
@@ -282,16 +258,22 @@ class Compare extends MY_Controller
                  * if it is no longer in the development database it is assumed 
                  * it is removed and should be removed from the Live database too
                  */
-                if (!$this->in_array_recursive($field["name"], $destination_field_structures[$table]))
+                if (!$this->in_array_recursive($field["Field"], $destination_field_structures[$table]))
                 {
                     //echo "<strong>The field name '" . $field["name"] . "' is missing inside '$table'</strong><br />";
                     if ($action == 'drop')
                     {
-                        $sql_commands_to_run[] = "ALTER TABLE $table DROP COLUMN " . $field["name"];
+                        $sql_commands_to_run[] = "ALTER TABLE $table DROP COLUMN " . $field["Field"];
                     }
                     else
                     {
-                        $sql_commands_to_run[] = "ALTER TABLE $table ADD COLUMN " . $field["name"];
+                        $alter_query = '';
+                        $alter_query = "ALTER TABLE $table ADD COLUMN " . $field["Field"] . " " . $field["Type"] . " CHARACTER SET " . $this->CHARACTER_SET;
+                        $alter_query .= (isset($field["Null"]) && $field["Null"] == 'YES') ? ' Null' : '';
+                        $alter_query .= " DEFAULT " . $field["Default"];
+                        $alter_query .= (isset($field["Extra"]) && $field["Extra"] != '') ? ' ' . $field["Extra"] : '';
+                        $alter_query .= ';';
+                        $sql_commands_to_run[] = $alter_query;
                     }
                 }
             }
@@ -311,7 +293,7 @@ class Compare extends MY_Controller
     {
         foreach ($haystack as $array => $item)
         {
-            $item = $item["name"]; // look in the name field only
+            $item = $item["Field"]; // look in the name field only
             if (($strict ? $item === $needle : $item == $needle) || (is_array($item) && in_array_recursive($needle, $item, $strict)))
             {
                 return true;
