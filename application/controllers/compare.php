@@ -13,6 +13,9 @@ class Compare extends MY_Controller
 
     function index()
     {
+        /*
+         * This will become a list of SQL Commands to run on the Live database to bring it up to date
+         */
         $sql_commands_to_run = array();
 
         /*
@@ -45,11 +48,16 @@ class Compare extends MY_Controller
             $sql_commands_to_run = array_merge($sql_commands_to_run, $this->create_new_tables($tables_to_create));
         }
 
-        $tables_up_update = $this->compare_table_structures($development_tables, $live_tables);
+        $tables_to_update = $this->compare_table_structures($development_tables, $live_tables);
 
-        if (is_array($tables_up_update) && !empty($tables_up_update))
+        /*
+         * Before comparing tables, remove any tables from the list that will be created in the $tables_to_create array
+         */
+        $tables_to_update = array_diff($tables_to_update, $tables_to_create);
+
+        if (is_array($tables_to_update) && !empty($tables_to_update))
         {
-            $sql_commands_to_run = array_merge($sql_commands_to_run, $this->update_existing_tables($tables_up_update));
+            $sql_commands_to_run = array_merge($sql_commands_to_run, $this->update_existing_tables($tables_to_update));
         }
 
         if (is_array($sql_commands_to_run) && !empty($sql_commands_to_run))
