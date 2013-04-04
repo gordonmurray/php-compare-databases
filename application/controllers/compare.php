@@ -13,6 +13,8 @@ class Compare extends MY_Controller
 
     function index()
     {
+        $sql_commands_to_run = array();
+
         /*
          * load both databases
          */
@@ -28,11 +30,6 @@ class Compare extends MY_Controller
         /*
          * list any tables in the development database that are not in the live database
          */
-        /*
-         * TODO: Update this next step to remove tables if no longer used
-         * currently it only adds tables to the Live DB if they are not there
-         * it should also delete old tables that are no longer in use on the live site
-         */
         $tables_to_create = array_diff($development_tables, $live_tables);
 
         /**
@@ -40,59 +37,35 @@ class Compare extends MY_Controller
          */
         if (is_array($tables_to_create) && !empty($tables_to_create))
         {
-            echo "<h2>Databases tables are out of Sync!</h3>\n";
+            /*
+             * TODO: Update this next step to remove tables if no longer used
+             * currently it only adds tables to the Live DB if they are not there
+             * it should also delete old tables that are no longer in use on the live site
+             */
+            $sql_commands_to_run = array_merge($sql_commands_to_run, $this->create_new_tables($tables_to_create));
+        }
 
-            $sql_commands_to_run = $this->create_new_tables($tables_to_create);
+        $tables_up_update = $this->compare_table_structures($development_tables, $live_tables);
 
+        if (is_array($tables_up_update) && !empty($tables_up_update))
+        {
+            $sql_commands_to_run = array_merge($sql_commands_to_run, $this->update_existing_tables($tables_up_update));
+        }
+
+        if (is_array($sql_commands_to_run) && !empty($sql_commands_to_run))
+        {
+            echo "<h2>The database is out of Sync!</h2>\n";
             echo "<p>The following SQL commands need to be executed to bring the Live database tables up to date: </p>\n";
-
-            if (is_array($sql_commands_to_run) && !empty($sql_commands_to_run))
+            echo "<ol>\n";
+            foreach ($sql_commands_to_run as $sql_command)
             {
-                foreach ($sql_commands_to_run as $sql_command)
-                {
-                    echo $sql_command . "<br />\n";
-                }
+                echo "<li>$sql_command</li>\n";
             }
-            else
-            {
-                echo "No table changes found<br />\n";
-            }
+            echo "<ol>\n";
         }
         else
         {
-
-            $tables_up_update = $this->compare_table_structures($development_tables, $live_tables);
-
-            if (is_array($tables_up_update) && !empty($tables_up_update))
-            {
-                echo "<h2>Databases table structures are out of Sync!</h2>\n";
-                echo "<p>The following tables need to be updated:<p>\n";
-
-                foreach ($tables_up_update as $table)
-                {
-                    echo " - $table <br />\n";
-                }
-
-                $sql_commands_to_run = $this->update_existing_tables($tables_up_update);
-
-                echo "<p>The following SQL commands need to be executed to bring the Live database up to date: </p>\n";
-
-                if (is_array($sql_commands_to_run) && !empty($sql_commands_to_run))
-                {
-                    foreach ($sql_commands_to_run as $sql_command)
-                    {
-                        echo $sql_command . "<br />\n";
-                    }
-                }
-                else
-                {
-                    echo "No field changes found<br />\n";
-                }
-            }
-            else
-            {
-                echo "<h2>Databases tables appear to be in Sync</h3>\n";
-            }
+            echo "<h2>The database appears to be up to date</h2>\n";
         }
     }
 
@@ -164,7 +137,7 @@ class Compare extends MY_Controller
         foreach ($development_tables as $table)
         {
             $development_table = $development_table_structures[$table];
-            $live_table = $live_table_structures[$table];
+            $live_table = (isset($live_table_structures[$table])) ? $live_table_structures[$table] : '';
 
             if ($this->count_differences($development_table, $live_table) > 0)
             {
@@ -257,24 +230,28 @@ class Compare extends MY_Controller
     function table_field_data($database, $table)
     {
         $fields = array();
+
         $conn = mysql_connect($database["hostname"], $database["username"], $database["password"]);
 
         mysql_select_db($database["database"]);
+
         $result = mysql_query('select * from ' . $table);
 
-        $i = 0;
-        while ($i < mysql_num_fields($result))
+        if (is_resource($result))
         {
-
-            $meta = mysql_fetch_field($result, $i);
-            if ($meta)
+            $i = 0;
+            while ($i < mysql_num_fields($result))
             {
-                $fields[] = (array) $meta;
-                $i++;
-            }
-        }
-        mysql_free_result($result);
 
+                $meta = mysql_fetch_field($result, $i);
+                if ($meta)
+                {
+                    $fields[] = (array) $meta;
+                    $i++;
+                }
+            }
+            mysql_free_result($result);
+        }
         return $fields;
     }
 
