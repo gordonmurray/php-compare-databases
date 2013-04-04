@@ -46,10 +46,10 @@ class Compare extends MY_Controller
          */
         $tables_to_update = array_diff($tables_to_update, $tables_to_create);
 
-        if (is_array($tables_to_update) && !empty($tables_to_update))
-        {
-            $sql_commands_to_run = array_merge($sql_commands_to_run, $this->update_existing_tables($tables_to_update));
-        }
+        /*
+         * update tables, add/remove columns
+         */
+        $sql_commands_to_run = (is_array($tables_to_update) && !empty($tables_to_update)) ? array_merge($sql_commands_to_run, $this->update_existing_tables($tables_to_update)) : '';
 
         if (is_array($sql_commands_to_run) && !empty($sql_commands_to_run))
         {
