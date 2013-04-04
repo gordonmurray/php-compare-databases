@@ -84,7 +84,7 @@ class Compare extends MY_Controller
             {
                 $query = $this->DB1->query("SHOW CREATE TABLE $table -- create tables");
                 $table_structure = $query->row_array();
-                $sql_commands_to_run[] = $table_structure["Create Table"];
+                $sql_commands_to_run[] = $table_structure["Create Table"] . ";";
             }
         }
 
@@ -185,6 +185,7 @@ class Compare extends MY_Controller
      */
     function update_existing_tables($tables)
     {
+        $sql_commands_to_run = array();
         $table_structure_development = array();
         $table_structure_live = array();
 
@@ -196,8 +197,6 @@ class Compare extends MY_Controller
                 $table_structure_live[$table] = $this->table_field_data((array) $this->DB2, $table);
             }
         }
-
-        $sql_commands_to_run = array(); // TODO: Start with a transaction lock?
 
         /*
          * first, remove any fields from $table_structure_live that are no longer in $table_structure_development
@@ -267,7 +266,6 @@ class Compare extends MY_Controller
                     }
                     else
                     {
-                        $alter_query = '';
                         $alter_query = "ALTER TABLE $table ADD COLUMN " . $field["Field"] . " " . $field["Type"] . " CHARACTER SET " . $this->CHARACTER_SET;
                         $alter_query .= (isset($field["Null"]) && $field["Null"] == 'YES') ? ' Null' : '';
                         $alter_query .= " DEFAULT " . $field["Default"];
