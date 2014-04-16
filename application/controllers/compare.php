@@ -214,7 +214,7 @@ class Compare extends MY_Controller
      */
     function table_field_data($database, $table)
     {
-        $conn = mysql_connect($database["hostname"], $database["username"], $database["password"]);
+        $conn = mysqli_connect($database["hostname"], $database["username"], $database["password"]);
 
         mysql_select_db($database["database"]);
 
