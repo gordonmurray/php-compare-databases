@@ -263,7 +263,6 @@ class Compare extends MY_Controller
                                 $modify_field = "ALTER TABLE $table MODIFY COLUMN " . $fields[$n]["Field"] . ' ' . $fields[$n]["Type"] . ' CHARACTER SET ' . $this->CHARACTER_SET;
                                 $modify_field .= (isset($fields[$n]["Default"]) && $fields[$n]["Default"] != '') ? ' DEFAULT \'' . $fields[$n]["Default"] . '\'' : '';
                                 $modify_field .= (isset($fields[$n]["Extra"]) && $fields[$n]["Extra"] != '') ? ' ' . $fields[$n]["Extra"] : '';
-                                $modify_field .= (isset($previous_field) && $previous_field != '') ? ' AFTER ' . $previous_field : '';
                                 $modify_field .= ';';
                             }
                             $previous_field = $fields[$n]["Field"];
@@ -282,6 +281,7 @@ class Compare extends MY_Controller
                     $add_field .= (isset($field["Null"]) && $field["Null"] == 'YES') ? ' Null' : '';
                     $add_field .= " DEFAULT " . $field["Default"];
                     $add_field .= (isset($field["Extra"]) && $field["Extra"] != '') ? ' ' . $field["Extra"] : '';
+                    $add_field .= (isset($previous_field) && $previous_field != '') ? ' AFTER ' . $previous_field : '';
                     $add_field .= ';';
                     $sql_commands_to_run[] = $add_field;
                 }
