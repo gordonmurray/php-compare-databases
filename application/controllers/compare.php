@@ -55,12 +55,12 @@ class Compare extends MY_Controller
         {
             echo "<h2>The database is out of Sync!</h2>\n";
             echo "<p>The following SQL commands need to be executed to bring the Live database tables up to date: </p>\n";
-            echo "<ol>\n";
+            echo "<pre style='padding: 20px; background-color: #FFFAF0;'>\n";
             foreach ($sql_commands_to_run as $sql_command)
             {
-                echo "<li>$sql_command</li>\n";
+                echo "$sql_command\n";
             }
-            echo "<ol>\n";
+            echo "<pre>\n";
         }
         else
         {
