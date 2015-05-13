@@ -260,7 +260,7 @@ class Compare extends MY_Controller
                             {
                                 // ALTER TABLE `bugs` MODIFY COLUMN `site_name`  varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL AFTER `type`;
                                 // ALTER TABLE `bugs` MODIFY COLUMN `message`  varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL AFTER `site_name`;
-                                $modify_field = "ALTER TABLE $table MODIFY COLUMN " . $fields[$n]["Field"] . ' ' . $fields[$n]["Type"] . ' CHARACTER SET ' . $this->CHARACTER_SET;
+                                $modify_field = "ALTER TABLE $table MODIFY COLUMN `" . $fields[$n]["Field"] . "` " . $fields[$n]["Type"] . ' CHARACTER SET ' . $this->CHARACTER_SET;
                                 $modify_field .= (isset($fields[$n]["Default"]) && $fields[$n]["Default"] != '') ? ' DEFAULT \'' . $fields[$n]["Default"] . '\'' : '';
                                 $modify_field .= (isset($fields[$n]["Null"]) && $fields[$n]["Null"] == 'YES') ? ' NULL' : ' NOT NULL';
                                 $modify_field .= (isset($fields[$n]["Extra"]) && $fields[$n]["Extra"] != '') ? ' ' . $fields[$n]["Extra"] : '';
@@ -279,7 +279,7 @@ class Compare extends MY_Controller
                     /*
                      * Add 
                      */
-                    $add_field = "ALTER TABLE $table ADD COLUMN " . $field["Field"] . " " . $field["Type"] . " CHARACTER SET " . $this->CHARACTER_SET;
+                    $add_field = "ALTER TABLE $table ADD COLUMN `" . $field["Field"] . "` " . $field["Type"] . " CHARACTER SET " . $this->CHARACTER_SET;
                     $add_field .= (isset($field["Null"]) && $field["Null"] == 'YES') ? ' Null' : '';
                     $add_field .= " DEFAULT " . $field["Default"];
                     $add_field .= (isset($field["Extra"]) && $field["Extra"] != '') ? ' ' . $field["Extra"] : '';
