@@ -9,7 +9,6 @@ class Compare extends MY_Controller
     function __construct()
     {
         parent::__construct();
-        $this->CHARACTER_SET = "utf8 COLLATE utf8_general_ci";
         $this->DB1 = $this->load->database('development', TRUE); // load the source/development database
         $this->DB2 = $this->load->database('live', TRUE); // load the destination/live database
     }
@@ -258,10 +257,10 @@ class Compare extends MY_Controller
 
                             if (is_array($differences) && !empty($differences))
                             {
-                                // ALTER TABLE `bugs` MODIFY COLUMN `site_name`  varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL AFTER `type`;
-                                // ALTER TABLE `bugs` MODIFY COLUMN `message`  varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL AFTER `site_name`;
-                                $modify_field = "ALTER TABLE $table MODIFY COLUMN " . $fields[$n]["Field"] . ' ' . $fields[$n]["Type"] . ' CHARACTER SET ' . $this->CHARACTER_SET;
-                                $modify_field .= (isset($fields[$n]["Default"]) && $fields[$n]["Default"] != '') ? ' DEFAULT \'' . $fields[$n]["Default"] . '\'' : '';
+                                /*
+                                 * Modify 
+                                 */
+                                $modify_field = "ALTER TABLE $table MODIFY COLUMN " . $fields[$n]["Field"] . ' ' . $fields[$n]["Type"];
                                 $modify_field .= (isset($fields[$n]["Extra"]) && $fields[$n]["Extra"] != '') ? ' ' . $fields[$n]["Extra"] : '';
                                 $modify_field .= (isset($previous_field) && $previous_field != '') ? ' AFTER ' . $previous_field : '';
                                 $modify_field .= ';';
@@ -278,9 +277,8 @@ class Compare extends MY_Controller
                     /*
                      * Add 
                      */
-                    $add_field = "ALTER TABLE $table ADD COLUMN " . $field["Field"] . " " . $field["Type"] . " CHARACTER SET " . $this->CHARACTER_SET;
-                    $add_field .= (isset($field["Null"]) && $field["Null"] == 'YES') ? ' Null' : '';
-                    $add_field .= " DEFAULT " . $field["Default"];
+                    $add_field = "ALTER TABLE $table ADD COLUMN " . $field["Field"] . " " . $field["Type"];
+                    $add_field .= (isset($field["NULL"]) && $field["NULL"] == 'YES') ? ' NULL' : '';
                     $add_field .= (isset($field["Extra"]) && $field["Extra"] != '') ? ' ' . $field["Extra"] : '';
                     $add_field .= ';';
                     $sql_commands_to_run[] = $add_field;
