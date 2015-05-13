@@ -82,7 +82,7 @@ class Compare extends MY_Controller
         {
             foreach ($tables as $table)
             {
-                $query = $this->DB1->query("SHOW CREATE TABLE $table -- create tables");
+                $query = $this->DB1->query("SHOW CREATE TABLE `$table` -- create tables");
                 $table_structure = $query->row_array();
                 $sql_commands_to_run[] = $table_structure["Create Table"] . ";";
             }
@@ -115,7 +115,7 @@ class Compare extends MY_Controller
          */
         foreach ($development_tables as $table)
         {
-            $query = $this->DB1->query("SHOW CREATE TABLE $table -- dev");
+            $query = $this->DB1->query("SHOW CREATE TABLE `$table` -- dev");
             $table_structure = $query->row_array();
             $development_table_structures[$table] = $table_structure["Create Table"];
         }
@@ -125,7 +125,7 @@ class Compare extends MY_Controller
          */
         foreach ($live_tables as $table)
         {
-            $query = $this->DB2->query("SHOW CREATE TABLE $table -- live");
+            $query = $this->DB2->query("SHOW CREATE TABLE `$table` -- live");
             $table_structure = $query->row_array();
             $live_table_structures[$table] = $table_structure["Create Table"];
         }
@@ -218,7 +218,7 @@ class Compare extends MY_Controller
 
         mysql_select_db($database["database"]);
 
-        $result = mysql_query("SHOW COLUMNS FROM " . $table);
+        $result = mysql_query("SHOW COLUMNS FROM `$table`");
 
         while ($row = mysql_fetch_assoc($result))
         {
