@@ -257,8 +257,9 @@ class Compare extends MY_Controller
 
                             if (is_array($differences) && !empty($differences))
                             {
-                                // ALTER TABLE `bugs` MODIFY COLUMN `site_name`  varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL AFTER `type`;
-                                // ALTER TABLE `bugs` MODIFY COLUMN `message`  varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL AFTER `site_name`;
+                                /*
+                                 * Modify 
+                                 */
                                 $modify_field = "ALTER TABLE $table MODIFY COLUMN " . $fields[$n]["Field"] . ' ' . $fields[$n]["Type"];
                                 $modify_field .= (isset($fields[$n]["Extra"]) && $fields[$n]["Extra"] != '') ? ' ' . $fields[$n]["Extra"] : '';
                                 $modify_field .= (isset($previous_field) && $previous_field != '') ? ' AFTER ' . $previous_field : '';
