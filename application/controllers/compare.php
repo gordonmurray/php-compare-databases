@@ -9,7 +9,6 @@ class Compare extends MY_Controller
     function __construct()
     {
         parent::__construct();
-        $this->CHARACTER_SET = "utf8 COLLATE utf8_general_ci";
         $this->DB1 = $this->load->database('development', TRUE); // load the source/development database
         $this->DB2 = $this->load->database('live', TRUE); // load the destination/live database
     }
