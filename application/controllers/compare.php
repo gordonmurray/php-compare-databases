@@ -282,9 +282,11 @@ class Compare extends MY_Controller
                     $add_field .= (isset($field["Extra"]) && $field["Extra"] != '') ? ' ' . $field["Extra"] : '';
                     $add_field .= (isset($previous_field) && $previous_field != '') ? ' AFTER ' . $previous_field : '';
                     $add_field .= ';';
-                    $previous_field = $field["Field"];
                     $sql_commands_to_run[] = $add_field;
                 }
+                
+                $previous_field = $field["Field"];
+
             }
         }
 
